@@ -1,5 +1,5 @@
 (ns rx
-  (:refer-clojure :exclude [map filter]))
+  (:refer-clojure :exclude [map filter merge]))
 
 (defn oseq [xs]
   (fn [onNext onError onCompleted]
@@ -89,4 +89,24 @@
               seqs (range))))
           unsubscribe))))
 
-(comment (dbgoseq (map (fn[x y] (print (+ x y))) (oseq [1 2 3]) (oseq [4 5 6]))))
+
+
+(defn merge [& xss]
+  (def numComplete (ref 0))
+  (fn [onNext onError onCompleted]
+    (dorun (clojure.core/map 
+      (fn [xs] (xs onNext onError 
+        (fn [] 
+            (dosync (ref-set numComplete (+ 1 (deref numComplete))))
+            (if (= (deref numComplete) (count xss)) (onCompleted))
+        )))
+      xss
+    ))
+  )
+)
+
+
+( (merge (oseq [1 2 3]) (oseq [4 5 6]) (oseq [7 8 9]) ) println println (fn [] (println "-")))
+
+
+(comment (dooseq (map (fn[x y] (print (+ x y))) (oseq [1 2 3]) (oseq [4 5 6])) (fn [x] (print x))))
